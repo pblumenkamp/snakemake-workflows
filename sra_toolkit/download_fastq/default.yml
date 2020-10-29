@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+  - bioconda
+  - anaconda
+  - default
+dependencies:
+  - sra-tools=2.10.8
