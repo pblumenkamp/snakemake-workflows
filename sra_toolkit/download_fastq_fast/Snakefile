@@ -1,0 +1,40 @@
+def get_sample_ids(file):
+    samples = []    
+    with open(file) as f:
+        for line in f:
+            samples.append(line.strip())
+    return samples
+
+
+#Input: File containing sra ids, one per line
+#Output: SRA IDs
+SAMPLES = get_sample_ids("id_file.txt")
+    
+
+rule all:
+    input:
+        expand("reads/{NAME}_{STRAND}.fastq.gz", NAME=SAMPLES, STRAND=[1,2])
+
+rule prefetch:
+    input:
+       "id_file.txt" 
+    output:
+        temp("sra/{name}.sra")
+    conda:
+        "default.yml"
+    threads: 1 
+    shell:
+        "prefetch -c -p -T sra -O ./sra {wildcards.name}"
+
+rule fastq_dump:
+    input:
+        "sra/{id}.sra"
+    output:
+        "reads/{id}_1.fastq.gz",
+        "reads/{id}_2.fastq.gz"
+    conda:
+        "default.yml"
+    threads: 4
+    shell:
+        "parallel-fastq-dump --threads {threads} --split-files --gzip --outdir ./reads --sra-id {input}"
+
