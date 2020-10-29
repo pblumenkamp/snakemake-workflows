@@ -1,0 +1,73 @@
+REFERENCE_GENOME="reference.fasta"
+
+rule all:
+    input:
+        expand("mapping/{NAME}.bam", NAME=["A", "B"]),
+        expand("mapping/{NAME}_disconc.bam", NAME=["A", "B"]),
+        expand("mapping/{NAME}_unmapped.bam", NAME=["A", "B"])
+
+rule bowtie2_index:
+    input:
+        genome=REFERENCE_GENOME
+    output:
+        "mapping/genome_index.fasta.1.bt2"
+    params:
+        prefix="mapping/genome_index.fasta"
+    log:
+        "mapping/logs/bowtie2_index.log"
+    conda:
+        "default.yml"
+    threads:
+        32
+    shell:
+        "bowtie2-build --threads {threads} {input.genome} {params.prefix} 2>&1 |"
+        "tee {log}"
+
+rule bowtie2_mapping:
+    input:
+        genome_index="mapping/genome_index.fasta.1.bt2",
+        reads_forward="{name}_1.fastq.gz",
+        reads_reverse="{name}_2.fastq.gz"
+    output:
+        temp("mapping/{name}.sam")
+    params:
+        prefix="mapping/genome_index.fasta"
+    log:
+        "mapping/logs/bowtie2_mapping.{name}.log"
+    conda:
+        "default.yml"
+    threads:
+        2
+    shell:
+        "bowtie2 -p {threads} --mm --very-sensitive -x {params.prefix} -1 {input.reads_forward} -2 {input.reads_reverse} -S {output} 2>&1 |"
+        "tee {log}"
+
+rule sam_to_bam_conc:
+    input:
+        "mapping/{sample}.sam"
+    output:
+        bam="mapping/{sample}.bam",
+    conda:
+        "default.yml"
+    shell:
+        "samtools view -F 4 -f 2 -Shb {input} > {output.bam}"
+
+rule sam_to_bam_disconc:
+    input:
+        "mapping/{sample}.sam"
+    output:
+        bam="mapping/{sample}_disconc.bam"
+    conda:
+        "default.yml"
+    shell:
+        "samtools view -F 6 -Shb {input} > {output.bam}"
+
+rule sam_to_bam_unmapped:
+    input:
+        "mapping/{sample}.sam"
+    output:
+        bam="mapping/{sample}_unmapped.bam",
+    conda:
+        "default.yml"
+    shell:
+        "samtools view -f 4  -Shb {input} > {output.bam}"
